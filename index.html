@@ -13,7 +13,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen p-3 md:p-6">
-  <div class="max-w-2xl mx-auto space-y-4">
+  <!-- PCでは max-w-6xl まで広げて2カラム表示 -->
+  <div class="max-w-2xl lg:max-w-6xl mx-auto space-y-4">
 
     <!-- ヘッダー -->
     <header class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -26,8 +27,8 @@
       <span id="sync-status" class="text-xs text-slate-400">クラウド同期準備中...</span>
     </header>
 
-    <!-- 自分が使うキャラ & 対面キャラ選択エリア -->
-    <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-lg space-y-4">
+    <!-- 自分が使うキャラ & 対面キャラ選択エリア（PCでは横並び） -->
+    <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-lg grid grid-cols-1 lg:grid-cols-2 gap-4">
 
       <!-- 自分が使うキャラ（お気に入り機能付き） -->
       <div class="p-3 rounded-lg bg-slate-950/70 border border-amber-500/30 space-y-2.5">
@@ -54,22 +55,24 @@
       </div>
 
       <!-- 対面キャラ -->
-      <div class="space-y-2">
+      <div class="p-3 rounded-lg bg-slate-950/40 border border-slate-800 space-y-2.5 flex flex-col justify-between">
         <label for="champ-select" class="block text-xs font-semibold text-slate-300">🎯 対面チャンピオン</label>
-        <input type="text" id="champ-search" placeholder="対面検索（例: Darius, ティーモ, zed ...）"
-          class="w-full p-2.5 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:border-amber-500 transition">
-        <select id="champ-select"
-          class="w-full p-2.5 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:border-amber-500 transition">
-          <option value="">-- または一覧から選択 --</option>
-        </select>
+        <div class="space-y-2">
+          <input type="text" id="champ-search" placeholder="対面検索（例: Darius, ティーモ, zed ...）"
+            class="w-full p-2 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:border-amber-500 transition">
+          <select id="champ-select"
+            class="w-full p-2 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:border-amber-500 transition">
+            <option value="">-- または一覧から選択 --</option>
+          </select>
+        </div>
       </div>
     </div>
 
-    <!-- メインコンテンツ -->
-    <div id="main-content" class="space-y-4">
+    <!-- メインコンテンツ（PCでは左：スキル詳細 / 右：2種類のメモ欄） -->
+    <div id="main-content" class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
 
-      <!-- 選択チャンピオン & スキル詳細 -->
-      <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-lg space-y-4">
+      <!-- 左カラム：選択チャンピオン & スキル詳細 -->
+      <div class="lg:col-span-6 bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-lg space-y-4">
         <div class="flex items-center justify-between border-b border-slate-800 pb-3 gap-2">
           <div class="flex items-center gap-3">
             <img id="champ-icon" src="" alt="" class="w-14 h-14 rounded-lg object-cover bg-slate-800 border border-slate-700 hidden">
@@ -92,30 +95,35 @@
         </div>
       </div>
 
-      <!-- 1. 相手キャラ共通の対策メモ（どの自キャラを選んでいても共通） -->
-      <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-lg space-y-2">
-        <div class="flex justify-between items-center gap-2">
-          <label for="common-memo-input" id="common-memo-label" class="text-xs font-bold text-sky-400 uppercase tracking-wider">
-            📌 相手キャラ対策メモ（自キャラ共通）
-          </label>
-          <span class="text-[10px] text-slate-500 shrink-0">全自キャラで共有</span>
-        </div>
-        <textarea id="common-memo-input" rows="5"
-          class="w-full p-3 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-sky-500 transition leading-relaxed"
-          placeholder="対面チャンピオンを選択すると、どの自キャラでも共通で見られる対策メモを書けます..."></textarea>
-      </div>
+      <!-- 右カラム：2種類の対策メモ（PCでは画面追従 sticky） -->
+      <div class="lg:col-span-6 space-y-4 lg:sticky lg:top-4">
 
-      <!-- 2. 自分 × 相手の組み合わせ専用メモ -->
-      <div class="bg-slate-900 p-4 rounded-xl border border-amber-500/30 shadow-lg space-y-2">
-        <div class="flex justify-between items-center gap-2">
-          <label for="matchup-memo-input" id="matchup-memo-label" class="text-xs font-bold text-amber-400 uppercase tracking-wider">
-            ⚔️ 対面個別メモ（自キャラ × 対面）
-          </label>
-          <span class="text-[10px] text-slate-500 shrink-0">スマホ・PC間 自動同期中</span>
+        <!-- 1. 相手キャラ共通の対策メモ -->
+        <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-lg space-y-2">
+          <div class="flex justify-between items-center gap-2">
+            <label for="common-memo-input" id="common-memo-label" class="text-xs font-bold text-sky-400 uppercase tracking-wider">
+              📌 相手キャラ対策メモ（自キャラ共通）
+            </label>
+            <span class="text-[10px] text-slate-500 shrink-0">全自キャラで共有</span>
+          </div>
+          <textarea id="common-memo-input" rows="7"
+            class="w-full p-3 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-sky-500 transition leading-relaxed"
+            placeholder="対面チャンピオンを選択すると、どの自キャラでも共通で見られる対策メモを書けます..."></textarea>
         </div>
-        <textarea id="matchup-memo-input" rows="6"
-          class="w-full p-3 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-amber-500 transition leading-relaxed"
-          placeholder="自分のキャラと対面キャラの両方を選ぶと、この組み合わせ専用のメモを書けます..."></textarea>
+
+        <!-- 2. 自分 × 相手の組み合わせ専用メモ -->
+        <div class="bg-slate-900 p-4 rounded-xl border border-amber-500/30 shadow-lg space-y-2">
+          <div class="flex justify-between items-center gap-2">
+            <label for="matchup-memo-input" id="matchup-memo-label" class="text-xs font-bold text-amber-400 uppercase tracking-wider">
+              ⚔️ 対面個別メモ（自キャラ × 対面）
+            </label>
+            <span class="text-[10px] text-slate-500 shrink-0">スマホ・PC間 自動同期中</span>
+          </div>
+          <textarea id="matchup-memo-input" rows="9"
+            class="w-full p-3 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-amber-500 transition leading-relaxed"
+            placeholder="自分のキャラと対面キャラの両方を選ぶと、この組み合わせ専用のメモを書けます..."></textarea>
+        </div>
+
       </div>
 
     </div>
@@ -169,13 +177,11 @@
       return `${selfId}__${enemyId}`;
     }
 
-    // 両方のメモ欄の見出し・内容を最新状態に更新
     function refreshMemoViews() {
       const enemyId = currentEnemyId || (champSelect ? champSelect.value : '');
       const enemyName = enemyId ? (championData[enemyId]?.name || enemyId) : '';
       const selfName = myChampId ? (championData[myChampId]?.name || myChampId) : '';
 
-      // 1. 相手キャラ共通メモ（キー: {enemyId}）
       if (enemyId) {
         commonMemoLabel.textContent = `📌 相手対策メモ：vs ${enemyName}（全自キャラ共通）`;
         commonMemoInput.disabled = false;
@@ -188,7 +194,6 @@
         commonMemoInput.disabled = true;
       }
 
-      // 2. 自分 × 相手の専用メモ（キー: {myChampId}__{enemyId}）
       if (myChampId && enemyId) {
         const key = getMatchupKey(myChampId, enemyId);
         matchupMemoLabel.textContent = `⚔️ 個別メモ：${selfName} vs ${enemyName}`;
@@ -208,7 +213,6 @@
       }
     }
 
-    // お気に入りバーと登録ボタンを描画
     function renderFavorites() {
       favChampsBar.innerHTML = '';
       favoriteChamps.forEach(champId => {
@@ -234,7 +238,6 @@
         favChampsBar.appendChild(btn);
       });
 
-      // お気に入り登録・解除ボタンの状態更新
       if (myChampId && championData[myChampId]) {
         toggleFavBtn.classList.remove('hidden');
         const isFav = favoriteChamps.includes(myChampId);
@@ -252,7 +255,6 @@
       refreshMemoViews();
     }
 
-    // --- クラウドからのデータ読み込み ---
     async function loadMemosFromCloud() {
       try {
         const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}/latest`, {
@@ -285,7 +287,6 @@
       }
     }
 
-    // --- クラウドへのデータ保存 ---
     async function saveMemosToCloud() {
       isSaving = true;
       syncStatus.textContent = 'クラウドへ保存中...';
@@ -329,7 +330,6 @@
       }, 500);
     }
 
-    // --- Data Dragon 初期化 ---
     async function initLoLData() {
       await loadMemosFromCloud();
 
@@ -356,7 +356,6 @@
           myChampSelect.appendChild(myOpt);
         });
 
-        // お気に入りリストの整合性チェック（空ならYoneを初期登録）
         favoriteChamps = favoriteChamps.filter(id => championData[id]);
         if (favoriteChamps.length === 0 && championData['Yone']) {
           favoriteChamps = ['Yone'];
@@ -374,7 +373,6 @@
       }
     }
 
-    // --- 対面チャンピオン情報の読み込み ---
     async function loadChampionDetail(champId) {
       if (!champId || !championData[champId]) return;
       currentEnemyId = champId;
@@ -445,7 +443,6 @@
       }) || '';
     }
 
-    // --- 1. 相手キャラ共通メモ入力時の自動保存 ---
     commonMemoInput.addEventListener('input', () => {
       const enemyId = currentEnemyId || (champSelect ? champSelect.value : '');
       if (!enemyId) return;
@@ -453,7 +450,6 @@
       scheduleAutoSave();
     });
 
-    // --- 2. 自分 × 相手専用メモ入力時の自動保存 ---
     matchupMemoInput.addEventListener('input', () => {
       const enemyId = currentEnemyId || (champSelect ? champSelect.value : '');
       if (!myChampId || !enemyId) return;
@@ -462,7 +458,6 @@
       scheduleAutoSave();
     });
 
-    // --- 自分キャラ・お気に入り操作 ---
     toggleFavBtn.addEventListener('click', () => {
       if (!myChampId) return;
       if (favoriteChamps.includes(myChampId)) {
@@ -486,7 +481,6 @@
       }
     });
 
-    // --- 対面キャラ操作 ---
     champSelect.addEventListener('change', (e) => {
       if (e.target.value) {
         if (searchInput) searchInput.value = '';
