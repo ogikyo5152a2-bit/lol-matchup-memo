@@ -13,7 +13,6 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen p-3 md:p-6">
-  <!-- PCでは max-w-6xl まで広げて2カラム表示 -->
   <div class="max-w-2xl lg:max-w-6xl mx-auto space-y-4">
 
     <!-- ヘッダー -->
@@ -27,7 +26,7 @@
       <span id="sync-status" class="text-xs text-slate-400">クラウド同期準備中...</span>
     </header>
 
-    <!-- 自分が使うキャラ & 対面キャラ選択エリア（PCでは横並び） -->
+    <!-- 自分が使うキャラ & 対面キャラ選択エリア -->
     <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-lg grid grid-cols-1 lg:grid-cols-2 gap-4">
 
       <!-- 自分が使うキャラ（お気に入り機能付き） -->
@@ -68,7 +67,7 @@
       </div>
     </div>
 
-    <!-- メインコンテンツ（PCでは左：スキル詳細 / 右：2種類のメモ欄） -->
+    <!-- メインコンテンツ -->
     <div id="main-content" class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
 
       <!-- 左カラム：選択チャンピオン & スキル詳細 -->
@@ -95,7 +94,7 @@
         </div>
       </div>
 
-      <!-- 右カラム：2種類の対策メモ（PCでは画面追従 sticky） -->
+      <!-- 右カラム：2種類の対策メモ -->
       <div class="lg:col-span-6 space-y-4 lg:sticky lg:top-4">
 
         <!-- 1. 相手キャラ共通の対策メモ -->
@@ -137,6 +136,7 @@
     const JSONBIN_API_KEY = '$2a$10$br6EMb6FlcCl6LWoreVIq.xaxHVm/KFTessT6K/WNzAGw9Otx/9z.';
     const LOCAL_MY_CHAMP_KEY = 'lol_matchup_my_champ_id';
     const LOCAL_FAV_CHAMPS_KEY = 'lol_matchup_favorite_champs';
+    const CLOUD_FAV_KEY = '__FAVORITE_CHAMPS__';
 
     let championData = {};
     let currentEnemyId = '';
@@ -214,6 +214,7 @@
     }
 
     function renderFavorites() {
+      if (!Object.keys(championData).length) return;
       favChampsBar.innerHTML = '';
       favoriteChamps.forEach(champId => {
         const champ = championData[champId];
@@ -270,6 +271,13 @@
           delete fetchedData.init;
           allMemos = fetchedData;
 
+          // クラウドにお気に入り配列があれば同期
+          if (Array.isArray(allMemos[CLOUD_FAV_KEY])) {
+            favoriteChamps = allMemos[CLOUD_FAV_KEY];
+            localStorage.setItem(LOCAL_FAV_CHAMPS_KEY, JSON.stringify(favoriteChamps));
+            renderFavorites();
+          }
+
           refreshMemoViews();
 
           if (!isSaving) {
@@ -293,6 +301,8 @@
       syncStatus.className = 'text-xs text-amber-400';
 
       try {
+        allMemos[CLOUD_FAV_KEY] = favoriteChamps;
+
         const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`, {
           method: 'PUT',
           headers: {
@@ -466,7 +476,9 @@
         favoriteChamps.push(myChampId);
       }
       localStorage.setItem(LOCAL_FAV_CHAMPS_KEY, JSON.stringify(favoriteChamps));
+      allMemos[CLOUD_FAV_KEY] = favoriteChamps;
       renderFavorites();
+      saveMemosToCloud();
     });
 
     myChampSelect.addEventListener('change', (e) => {
