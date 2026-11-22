@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LoL Matchup Memo</title>
+
+  <!-- ホーム画面追加用（ヨネアイコン・アプリ名） -->
+  <link rel="icon" type="image/png" href="https://ddragon.leagueoflegends.com/cdn/16.20.1/img/champion/Yone.png">
+  <link rel="apple-touch-icon" href="https://ddragon.leagueoflegends.com/cdn/16.20.1/img/champion/Yone.png">
+  <meta name="apple-mobile-web-app-title" content="LoL対面メモ">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen p-3 md:p-6">
+  <div class="max-w-2xl mx-auto space-y-4">
+
+    <!-- ヘッダー -->
+    <header class="flex items-center justify-between border-b border-slate-800 pb-3">
+      <div>
+        <p class="text-[10px] font-bold tracking-widest text-amber-500/80 uppercase">Summoner's Notebook</p>
+        <h1 class="text-xl font-bold tracking-wider text-amber-400 flex items-center gap-2">
+          <span class="text-2xl">⚔️</span> LoL 対面対策メモ
+        </h1>
+      </div>
+      <span id="sync-status" class="text-xs text-slate-400">クラウド同期準備中...</span>
+    </header>
+
+    <!-- 自分が使うキャラ & 対面キャラ選択エリア -->
+    <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-lg space-y-4">
+
+      <!-- 自分が使うキャラ（お気に入り機能付き） -->
+      <div class="p-3 rounded-lg bg-slate-950/70 border border-amber-500/30 space-y-2.5">
+        <div class="flex items-center justify-between gap-2">
+          <label for="my-champ-select" class="text-xs font-bold text-amber-400">🛡️ 自分が使うチャンピオン</label>
+          <button type="button" id="toggle-fav-btn"
+            class="text-[11px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 transition hidden">
+            ＋ お気に入り登録
+          </button>
+        </div>
+
+        <!-- お気に入りワンタップ切り替えバー -->
+        <div id="fav-champs-bar" class="flex flex-wrap gap-1.5"></div>
+
+        <!-- 検索 & プルダウン -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <input type="text" id="my-champ-search" placeholder="自キャラ検索（例: Yone, ヨネ）"
+            class="w-full p-2 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 placeholder-slate-500 text-xs focus:outline-none focus:border-amber-500 transition">
+          <select id="my-champ-select"
+            class="w-full p-2 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-amber-500 transition">
+            <option value="">-- 自分のキャラを選択 --</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 対面キャラ -->
+      <div class="space-y-2">
+        <label for="champ-select" class="block text-xs font-semibold text-slate-300">🎯 対面チャンピオン</label>
+        <input type="text" id="champ-search" placeholder="対面検索（例: Darius, ティーモ, zed ...）"
+          class="w-full p-2.5 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:border-amber-500 transition">
+        <select id="champ-select"
+          class="w-full p-2.5 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:border-amber-500 transition">
+          <option value="">-- または一覧から選択 --</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- メインコンテンツ -->
+    <div id="main-content" class="space-y-4">
+
+      <!-- 選択チャンピオン & スキル詳細 -->
+      <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-lg space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3 gap-2">
+          <div class="flex items-center gap-3">
+            <img id="champ-icon" src="" alt="" class="w-14 h-14 rounded-lg object-cover bg-slate-800 border border-slate-700 hidden">
+            <div>
+              <h2 id="champ-name" class="text-2xl font-black text-amber-400">チャンピオン未選択</h2>
+              <p id="champ-title" class="text-xs text-slate-400">上部の検索または選択から対面キャラを選んでください</p>
+            </div>
+          </div>
+          <span id="patch-badge" class="text-[11px] font-mono text-slate-500 shrink-0"></span>
+        </div>
+
+        <!-- スキル詳細・CD一覧 -->
+        <div>
+          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">スキル詳細 & クールダウン (CD)</h3>
+          <div id="skills-container" class="space-y-2">
+            <div class="text-xs text-slate-500 p-4 text-center bg-slate-950/50 rounded-lg border border-slate-800">
+              対面を選択するとスキル情報が表示されます
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 1. 相手キャラ共通の対策メモ（どの自キャラを選んでいても共通） -->
+      <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-lg space-y-2">
+        <div class="flex justify-between items-center gap-2">
+          <label for="common-memo-input" id="common-memo-label" class="text-xs font-bold text-sky-400 uppercase tracking-wider">
+            📌 相手キャラ対策メモ（自キャラ共通）
+          </label>
+          <span class="text-[10px] text-slate-500 shrink-0">全自キャラで共有</span>
+        </div>
+        <textarea id="common-memo-input" rows="5"
+          class="w-full p-3 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-sky-500 transition leading-relaxed"
+          placeholder="対面チャンピオンを選択すると、どの自キャラでも共通で見られる対策メモを書けます..."></textarea>
+      </div>
+
+      <!-- 2. 自分 × 相手の組み合わせ専用メモ -->
+      <div class="bg-slate-900 p-4 rounded-xl border border-amber-500/30 shadow-lg space-y-2">
+        <div class="flex justify-between items-center gap-2">
+          <label for="matchup-memo-input" id="matchup-memo-label" class="text-xs font-bold text-amber-400 uppercase tracking-wider">
+            ⚔️ 対面個別メモ（自キャラ × 対面）
+          </label>
+          <span class="text-[10px] text-slate-500 shrink-0">スマホ・PC間 自動同期中</span>
+        </div>
+        <textarea id="matchup-memo-input" rows="6"
+          class="w-full p-3 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-amber-500 transition leading-relaxed"
+          placeholder="自分のキャラと対面キャラの両方を選ぶと、この組み合わせ専用のメモを書けます..."></textarea>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // ==========================================
+    // JSONBin.io 接続設定
+    // ==========================================
+    const JSONBIN_BIN_ID = '6acef0dbac6210605a2f8d8d';
+    const JSONBIN_API_KEY = '$2a$10$br6EMb6FlcCl6LWoreVIq.xaxHVm/KFTessT6K/WNzAGw9Otx/9z.';
+    const LOCAL_MY_CHAMP_KEY = 'lol_matchup_my_champ_id';
+    const LOCAL_FAV_CHAMPS_KEY = 'lol_matchup_favorite_champs';
+
+    let championData = {};
+    let currentEnemyId = '';
+    let myChampId = localStorage.getItem(LOCAL_MY_CHAMP_KEY) || 'Yone';
+    let favoriteChamps = JSON.parse(localStorage.getItem(LOCAL_FAV_CHAMPS_KEY) || '["Yone"]');
+    let allMemos = {};
+    let saveTimeout = null;
+    let isSaving = false;
+    let patchVersion = '14.24.1';
+
+    const myChampSearch = document.getElementById('my-champ-search');
+    const myChampSelect = document.getElementById('my-champ-select');
+    const toggleFavBtn = document.getElementById('toggle-fav-btn');
+    const favChampsBar = document.getElementById('fav-champs-bar');
+
+    const searchInput = document.getElementById('champ-search');
+    const champSelect = document.getElementById('champ-select');
+    const champNameEl = document.getElementById('champ-name');
+    const champTitleEl = document.getElementById('champ-title');
+    const champIconEl = document.getElementById('champ-icon');
+    const patchBadgeEl = document.getElementById('patch-badge');
+    const skillsContainer = document.getElementById('skills-container');
+
+    const commonMemoLabel = document.getElementById('common-memo-label');
+    const commonMemoInput = document.getElementById('common-memo-input');
+    const matchupMemoLabel = document.getElementById('matchup-memo-label');
+    const matchupMemoInput = document.getElementById('matchup-memo-input');
+    const syncStatus = document.getElementById('sync-status');
+
+    function stripHtml(html) {
+      const tmp = document.createElement('DIV');
+      tmp.innerHTML = html;
+      return tmp.textContent || tmp.innerText || '';
+    }
+
+    function getMatchupKey(selfId = myChampId, enemyId = currentEnemyId) {
+      if (!selfId || !enemyId) return '';
+      return `${selfId}__${enemyId}`;
+    }
+
+    // 両方のメモ欄の見出し・内容を最新状態に更新
+    function refreshMemoViews() {
+      const enemyId = currentEnemyId || (champSelect ? champSelect.value : '');
+      const enemyName = enemyId ? (championData[enemyId]?.name || enemyId) : '';
+      const selfName = myChampId ? (championData[myChampId]?.name || myChampId) : '';
+
+      // 1. 相手キャラ共通メモ（キー: {enemyId}）
+      if (enemyId) {
+        commonMemoLabel.textContent = `📌 相手対策メモ：vs ${enemyName}（全自キャラ共通）`;
+        commonMemoInput.disabled = false;
+        if (document.activeElement !== commonMemoInput) {
+          commonMemoInput.value = allMemos[enemyId] || '';
+        }
+      } else {
+        commonMemoLabel.textContent = '📌 相手キャラ対策メモ（自キャラ共通）';
+        commonMemoInput.value = '';
+        commonMemoInput.disabled = true;
+      }
+
+      // 2. 自分 × 相手の専用メモ（キー: {myChampId}__{enemyId}）
+      if (myChampId && enemyId) {
+        const key = getMatchupKey(myChampId, enemyId);
+        matchupMemoLabel.textContent = `⚔️ 個別メモ：${selfName} vs ${enemyName}`;
+        matchupMemoInput.disabled = false;
+        matchupMemoInput.placeholder = `${selfName} で ${enemyName} と戦うときの立ち回り・ビルド・注意点...`;
+        if (document.activeElement !== matchupMemoInput) {
+          matchupMemoInput.value = allMemos[key] || '';
+        }
+      } else if (!myChampId && enemyId) {
+        matchupMemoLabel.textContent = `⚔️ 個別メモ（上の「自分が使うチャンピオン」を選ぶと入力できます）`;
+        matchupMemoInput.value = '';
+        matchupMemoInput.disabled = true;
+      } else {
+        matchupMemoLabel.textContent = '⚔️ 対面個別メモ（自キャラ × 対面）';
+        matchupMemoInput.value = '';
+        matchupMemoInput.disabled = true;
+      }
+    }
+
+    // お気に入りバーと登録ボタンを描画
+    function renderFavorites() {
+      favChampsBar.innerHTML = '';
+      favoriteChamps.forEach(champId => {
+        const champ = championData[champId];
+        if (!champ) return;
+
+        const isSelected = champId === myChampId;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium border transition ${
+          isSelected
+            ? 'bg-amber-500/20 border-amber-400 text-amber-200 shadow-sm'
+            : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-500'
+        }`;
+        btn.innerHTML = `
+          <img src="https://ddragon.leagueoflegends.com/cdn/${patchVersion}/img/champion/${champ.image.full}"
+               alt="${champ.name}" class="w-5 h-5 rounded-full object-cover">
+          <span>${champ.name}</span>
+        `;
+        btn.addEventListener('click', () => {
+          setMyChampion(champId);
+        });
+        favChampsBar.appendChild(btn);
+      });
+
+      // お気に入り登録・解除ボタンの状態更新
+      if (myChampId && championData[myChampId]) {
+        toggleFavBtn.classList.remove('hidden');
+        const isFav = favoriteChamps.includes(myChampId);
+        toggleFavBtn.textContent = isFav ? '★ お気に入り解除' : '＋ お気に入り登録';
+      } else {
+        toggleFavBtn.classList.add('hidden');
+      }
+    }
+
+    function setMyChampion(champId) {
+      myChampId = champId || '';
+      myChampSelect.value = myChampId;
+      localStorage.setItem(LOCAL_MY_CHAMP_KEY, myChampId);
+      renderFavorites();
+      refreshMemoViews();
+    }
+
+    // --- クラウドからのデータ読み込み ---
+    async function loadMemosFromCloud() {
+      try {
+        const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}/latest`, {
+          method: 'GET',
+          headers: {
+            'X-Master-Key': JSONBIN_API_KEY
+          }
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          const fetchedData = json.record || {};
+          delete fetchedData.init;
+          allMemos = fetchedData;
+
+          refreshMemoViews();
+
+          if (!isSaving) {
+            syncStatus.textContent = 'クラウド同期完了 ✓';
+            syncStatus.className = 'text-xs text-emerald-400';
+          }
+        } else {
+          syncStatus.textContent = `同期エラー (${res.status})`;
+          syncStatus.className = 'text-xs text-rose-400';
+        }
+      } catch (e) {
+        console.error('読み込みエラー:', e);
+        syncStatus.textContent = '通信エラー';
+        syncStatus.className = 'text-xs text-rose-400';
+      }
+    }
+
+    // --- クラウドへのデータ保存 ---
+    async function saveMemosToCloud() {
+      isSaving = true;
+      syncStatus.textContent = 'クラウドへ保存中...';
+      syncStatus.className = 'text-xs text-amber-400';
+
+      try {
+        const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Master-Key': JSONBIN_API_KEY
+          },
+          body: JSON.stringify(allMemos)
+        });
+
+        const resJson = await res.json().catch(() => ({}));
+
+        if (res.ok) {
+          syncStatus.textContent = '自動保存完了 ✓';
+          syncStatus.className = 'text-xs text-emerald-400';
+        } else {
+          const errMsg = resJson.message || `HTTP ${res.status}`;
+          syncStatus.textContent = `保存エラー: ${errMsg}`;
+          syncStatus.className = 'text-xs text-rose-400 font-bold';
+        }
+      } catch (e) {
+        console.error('保存通信エラー:', e);
+        syncStatus.textContent = '通信エラー';
+        syncStatus.className = 'text-xs text-rose-400 font-bold';
+      } finally {
+        isSaving = false;
+      }
+    }
+
+    function scheduleAutoSave() {
+      syncStatus.textContent = '入力中...';
+      syncStatus.className = 'text-xs text-amber-400/80';
+      clearTimeout(saveTimeout);
+      saveTimeout = setTimeout(() => {
+        saveMemosToCloud();
+      }, 500);
+    }
+
+    // --- Data Dragon 初期化 ---
+    async function initLoLData() {
+      await loadMemosFromCloud();
+
+      try {
+        const versionsRes = await fetch('https://ddragon.leagueoflegends.com/api/versions.json');
+        const versions = await versionsRes.json();
+        patchVersion = versions[0];
+        patchBadgeEl.textContent = `Patch ${patchVersion}`;
+
+        const champRes = await fetch(`https://ddragon.leagueoflegends.com/cdn/${patchVersion}/data/ja_JP/champion.json`);
+        const champJson = await champRes.json();
+        championData = champJson.data;
+
+        const sortedChamps = Object.values(championData).sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+        sortedChamps.forEach(champ => {
+          const enemyOpt = document.createElement('option');
+          enemyOpt.value = champ.id;
+          enemyOpt.textContent = `${champ.name} (${champ.title})`;
+          champSelect.appendChild(enemyOpt);
+
+          const myOpt = document.createElement('option');
+          myOpt.value = champ.id;
+          myOpt.textContent = `${champ.name} (${champ.title})`;
+          myChampSelect.appendChild(myOpt);
+        });
+
+        // お気に入りリストの整合性チェック（空ならYoneを初期登録）
+        favoriteChamps = favoriteChamps.filter(id => championData[id]);
+        if (favoriteChamps.length === 0 && championData['Yone']) {
+          favoriteChamps = ['Yone'];
+          localStorage.setItem(LOCAL_FAV_CHAMPS_KEY, JSON.stringify(favoriteChamps));
+        }
+
+        if (myChampId && championData[myChampId]) {
+          setMyChampion(myChampId);
+        } else {
+          setMyChampion(favoriteChamps[0] || '');
+        }
+      } catch (e) {
+        console.error(e);
+        champTitleEl.textContent = 'チャンピオンデータの読み込みに失敗しました';
+      }
+    }
+
+    // --- 対面チャンピオン情報の読み込み ---
+    async function loadChampionDetail(champId) {
+      if (!champId || !championData[champId]) return;
+      currentEnemyId = champId;
+      const champ = championData[champId];
+
+      champNameEl.textContent = champ.name;
+      champTitleEl.textContent = champ.title;
+      champIconEl.src = `https://ddragon.leagueoflegends.com/cdn/${patchVersion}/img/champion/${champ.image.full}`;
+      champIconEl.classList.remove('hidden');
+
+      refreshMemoViews();
+
+      try {
+        const detailRes = await fetch(`https://ddragon.leagueoflegends.com/cdn/${patchVersion}/data/ja_JP/champion/${champId}.json`);
+        const detailJson = await detailRes.json();
+        const detail = detailJson.data[champId];
+
+        skillsContainer.innerHTML = '';
+        const passive = detail.passive;
+        renderSkillCard('P', passive.name, passive.image.full, 'パッシブ', passive.description);
+
+        const spells = detail.spells;
+        const keys = ['Q', 'W', 'E', 'R'];
+        spells.forEach((spell, idx) => {
+          const cdText = spell.cooldownBurn ? `CD: ${spell.cooldownBurn}s` : '';
+          renderSkillCard(keys[idx], spell.name, spell.image.full, cdText, spell.description);
+        });
+      } catch (e) {
+        skillsContainer.innerHTML = '<div class="text-xs text-red-400 p-2">スキル詳細の読み込みに失敗しました</div>';
+      }
+    }
+
+    function renderSkillCard(key, name, imgFilename, cdText, description) {
+      const isPassive = key === 'P';
+      const imgUrl = isPassive
+        ? `https://ddragon.leagueoflegends.com/cdn/${patchVersion}/img/passive/${imgFilename}`
+        : `https://ddragon.leagueoflegends.com/cdn/${patchVersion}/img/spell/${imgFilename}`;
+      const cleanDesc = stripHtml(description);
+
+      const card = document.createElement('div');
+      card.className = 'bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-2';
+      card.innerHTML = `
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <img src="${imgUrl}" alt="${key}" class="w-9 h-9 rounded object-cover bg-slate-900 border border-slate-700 shrink-0">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="px-1.5 py-0.5 bg-slate-800 text-amber-400 font-bold text-[10px] rounded">${key}</span>
+                <span class="text-xs font-semibold text-slate-100">${name}</span>
+              </div>
+            </div>
+          </div>
+          <span class="text-[11px] text-amber-300/90 font-mono font-medium">${cdText}</span>
+        </div>
+        <p class="text-xs text-slate-400 leading-relaxed pl-1 border-l-2 border-slate-800">${cleanDesc}</p>
+      `;
+      skillsContainer.appendChild(card);
+    }
+
+    function findChampionByQuery(rawQuery) {
+      const query = rawQuery.trim().toLowerCase();
+      if (!query) return '';
+      return Object.keys(championData).find(key => {
+        const c = championData[key];
+        return c.id.toLowerCase() === query ||
+               c.name.toLowerCase().includes(query) ||
+               (c.tags && c.tags.some(t => t.toLowerCase().includes(query)));
+      }) || '';
+    }
+
+    // --- 1. 相手キャラ共通メモ入力時の自動保存 ---
+    commonMemoInput.addEventListener('input', () => {
+      const enemyId = currentEnemyId || (champSelect ? champSelect.value : '');
+      if (!enemyId) return;
+      allMemos[enemyId] = commonMemoInput.value;
+      scheduleAutoSave();
+    });
+
+    // --- 2. 自分 × 相手専用メモ入力時の自動保存 ---
+    matchupMemoInput.addEventListener('input', () => {
+      const enemyId = currentEnemyId || (champSelect ? champSelect.value : '');
+      if (!myChampId || !enemyId) return;
+      const key = getMatchupKey(myChampId, enemyId);
+      allMemos[key] = matchupMemoInput.value;
+      scheduleAutoSave();
+    });
+
+    // --- 自分キャラ・お気に入り操作 ---
+    toggleFavBtn.addEventListener('click', () => {
+      if (!myChampId) return;
+      if (favoriteChamps.includes(myChampId)) {
+        favoriteChamps = favoriteChamps.filter(id => id !== myChampId);
+      } else {
+        favoriteChamps.push(myChampId);
+      }
+      localStorage.setItem(LOCAL_FAV_CHAMPS_KEY, JSON.stringify(favoriteChamps));
+      renderFavorites();
+    });
+
+    myChampSelect.addEventListener('change', (e) => {
+      if (myChampSearch) myChampSearch.value = '';
+      setMyChampion(e.target.value);
+    });
+
+    myChampSearch.addEventListener('input', (e) => {
+      const foundKey = findChampionByQuery(e.target.value);
+      if (foundKey) {
+        setMyChampion(foundKey);
+      }
+    });
+
+    // --- 対面キャラ操作 ---
+    champSelect.addEventListener('change', (e) => {
+      if (e.target.value) {
+        if (searchInput) searchInput.value = '';
+        loadChampionDetail(e.target.value);
+      }
+    });
+
+    searchInput.addEventListener('input', (e) => {
+      const foundKey = findChampionByQuery(e.target.value);
+      if (foundKey) {
+        champSelect.value = foundKey;
+        loadChampionDetail(foundKey);
+      }
+    });
+
+    setInterval(() => {
+      if (!isSaving && document.activeElement !== commonMemoInput && document.activeElement !== matchupMemoInput) {
+        loadMemosFromCloud();
+      }
+    }, 3000);
+
+    initLoLData();
+  </script>
+</body>
+</html>
