@@ -97,17 +97,40 @@
       <!-- 右カラム：ビルドメモ & 2種類の対策メモ -->
       <div class="lg:col-span-6 space-y-4 lg:sticky lg:top-4">
 
-        <!-- 1. ビルド・ルーンメモ（自キャラ × 対面） -->
-        <div class="bg-slate-900 p-4 rounded-xl border border-emerald-500/30 shadow-lg space-y-2">
+        <!-- 1. ビルド・ルーンメモ（アイテムアイコン + テキスト） -->
+        <div class="bg-slate-900 p-4 rounded-xl border border-emerald-500/30 shadow-lg space-y-3">
           <div class="flex justify-between items-center gap-2">
             <label for="build-memo-input" id="build-memo-label" class="text-xs font-bold text-emerald-400 uppercase tracking-wider">
               🛡️ ビルド・ルーンメモ（自キャラ × 対面）
             </label>
             <span class="text-[10px] text-slate-500 shrink-0">自動同期中</span>
           </div>
-          <textarea id="build-memo-input" rows="5"
+
+          <!-- 選択済みアイテムアイコン並び -->
+          <div class="p-2.5 rounded-lg bg-slate-950 border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-semibold text-emerald-300/90">📦 ビルド順アイコン（タップで削除）</span>
+              <button type="button" id="clear-build-items-btn"
+                class="text-[10px] text-slate-400 hover:text-rose-400 transition hidden">
+                すべてクリア
+              </button>
+            </div>
+            <div id="selected-build-items" class="flex flex-wrap items-center gap-1.5 min-h-[42px]">
+              <span class="text-xs text-slate-600">下の検索からアイテムをタップして追加できます</span>
+            </div>
+
+            <!-- アイテム検索 & 候補一覧 -->
+            <div class="pt-1 border-t border-slate-800/80 space-y-2">
+              <input type="text" id="item-search" placeholder="アイテム検索（例: ルインドキング, スチール, ドラン, ゾーニャ...）"
+                class="w-full p-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 placeholder-slate-500 text-xs focus:outline-none focus:border-emerald-500 transition">
+              <div id="item-search-results" class="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto"></div>
+            </div>
+          </div>
+
+          <!-- ビルド・ルーン自由記述欄 -->
+          <textarea id="build-memo-input" rows="4"
             class="w-full p-3 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-emerald-500 transition leading-relaxed"
-            placeholder="自分のキャラと対面キャラを選ぶと、初手アイテム・コアビルド・靴・ルーンなどを記録できます..."></textarea>
+            placeholder="ルーン・サモナースペル・購入順の補足メモなどを自由に入力..."></textarea>
         </div>
 
         <!-- 2. 自分 × 相手の組み合わせ専用立ち回りメモ -->
@@ -118,7 +141,7 @@
             </label>
             <span class="text-[10px] text-slate-500 shrink-0">自動同期中</span>
           </div>
-          <textarea id="matchup-memo-input" rows="6"
+          <textarea id="matchup-memo-input" rows="5"
             class="w-full p-3 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-amber-500 transition leading-relaxed"
             placeholder="自分のキャラと対面キャラの両方を選ぶと、この組み合わせ専用の立ち回りメモを書けます..."></textarea>
         </div>
@@ -131,7 +154,7 @@
             </label>
             <span class="text-[10px] text-slate-500 shrink-0">全自キャラで共有</span>
           </div>
-          <textarea id="common-memo-input" rows="5"
+          <textarea id="common-memo-input" rows="4"
             class="w-full p-3 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-sky-500 transition leading-relaxed"
             placeholder="対面チャンピオンを選択すると、どの自キャラでも共通で見られる対策メモを書けます..."></textarea>
         </div>
@@ -152,6 +175,8 @@
     const CLOUD_FAV_KEY = '__FAVORITE_CHAMPS__';
 
     let championData = {};
+    let itemData = {};
+    let searchableItems = [];
     let currentEnemyId = '';
     let myChampId = localStorage.getItem(LOCAL_MY_CHAMP_KEY) || 'Yone';
     let favoriteChamps = JSON.parse(localStorage.getItem(LOCAL_FAV_CHAMPS_KEY) || '["Yone"]');
@@ -172,6 +197,11 @@
     const champIconEl = document.getElementById('champ-icon');
     const patchBadgeEl = document.getElementById('patch-badge');
     const skillsContainer = document.getElementById('skills-container');
+
+    const selectedBuildItemsEl = document.getElementById('selected-build-items');
+    const clearBuildItemsBtn = document.getElementById('clear-build-items-btn');
+    const itemSearchInput = document.getElementById('item-search');
+    const itemSearchResultsEl = document.getElementById('item-search-results');
 
     const buildMemoLabel = document.getElementById('build-memo-label');
     const buildMemoInput = document.getElementById('build-memo-input');
@@ -195,6 +225,120 @@
     function getBuildKey(selfId = myChampId, enemyId = currentEnemyId) {
       if (!selfId || !enemyId) return '';
       return `build__${selfId}__${enemyId}`;
+    }
+
+    function getBuildItemsKey(selfId = myChampId, enemyId = currentEnemyId) {
+      if (!selfId || !enemyId) return '';
+      return `build_items__${selfId}__${enemyId}`;
+    }
+
+    // 選択済みビルドアイコン描画
+    function renderSelectedBuildItems() {
+      const enemyId = currentEnemyId || (champSelect ? champSelect.value : '');
+      const canEdit = Boolean(myChampId && enemyId && Object.keys(itemData).length);
+      itemSearchInput.disabled = !canEdit;
+
+      if (!canEdit) {
+        selectedBuildItemsEl.innerHTML = '<span class="text-xs text-slate-600">自キャラと対面キャラを選ぶとアイテムアイコンを追加できます</span>';
+        clearBuildItemsBtn.classList.add('hidden');
+        itemSearchResultsEl.innerHTML = '';
+        return;
+      }
+
+      const itemsKey = getBuildItemsKey(myChampId, enemyId);
+      const itemIds = Array.isArray(allMemos[itemsKey]) ? allMemos[itemsKey] : [];
+
+      if (itemIds.length === 0) {
+        selectedBuildItemsEl.innerHTML = '<span class="text-xs text-slate-600">下の検索からアイテムをタップして追加できます</span>';
+        clearBuildItemsBtn.classList.add('hidden');
+        return;
+      }
+
+      clearBuildItemsBtn.classList.remove('hidden');
+      selectedBuildItemsEl.innerHTML = '';
+
+      itemIds.forEach((itemId, index) => {
+        const item = itemData[itemId];
+        if (!item) return;
+
+        if (index > 0) {
+          const arrow = document.createElement('span');
+          arrow.className = 'text-slate-600 text-xs font-bold';
+          arrow.textContent = '→';
+          selectedBuildItemsEl.appendChild(arrow);
+        }
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.title = `${item.name}（タップで削除）`;
+        btn.className = 'group relative flex items-center gap-1.5 bg-slate-900 hover:bg-rose-950/60 border border-emerald-500/40 hover:border-rose-500/60 rounded-lg p-1 pr-2 transition';
+        btn.innerHTML = `
+          <img src="https://ddragon.leagueoflegends.com/cdn/${patchVersion}/img/item/${item.image.full}"
+               alt="${item.name}" class="w-8 h-8 rounded object-cover bg-slate-800">
+          <span class="text-[11px] text-slate-200 group-hover:text-rose-200 max-w-[96px] truncate">${item.name}</span>
+        `;
+        btn.addEventListener('click', () => {
+          const updated = itemIds.filter((_, idx) => idx !== index);
+          allMemos[itemsKey] = updated;
+          renderSelectedBuildItems();
+          scheduleAutoSave();
+        });
+        selectedBuildItemsEl.appendChild(btn);
+      });
+    }
+
+    // アイテム検索候補の描画
+    function renderItemSearchResults(rawQuery) {
+      const enemyId = currentEnemyId || (champSelect ? champSelect.value : '');
+      if (!myChampId || !enemyId) {
+        itemSearchResultsEl.innerHTML = '';
+        return;
+      }
+
+      const query = rawQuery.trim().toLowerCase();
+      if (!query) {
+        itemSearchResultsEl.innerHTML = '';
+        return;
+      }
+
+      const matches = searchableItems
+        .filter(item =>
+          item.name.toLowerCase().includes(query) ||
+          item.colloq.toLowerCase().includes(query) ||
+          item.plaintext.toLowerCase().includes(query)
+        )
+        .slice(0, 18);
+
+      itemSearchResultsEl.innerHTML = '';
+      if (matches.length === 0) {
+        itemSearchResultsEl.innerHTML = '<span class="text-[11px] text-slate-500 py-1">一致するアイテムが見つかりません</span>';
+        return;
+      }
+
+      matches.forEach(item => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.title = `${item.name} (${item.gold}G)`;
+        btn.className = 'flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-900 hover:bg-emerald-950/60 border border-slate-700 hover:border-emerald-500/60 text-left transition';
+        btn.innerHTML = `
+          <img src="https://ddragon.leagueoflegends.com/cdn/${patchVersion}/img/item/${item.image.full}"
+               alt="${item.name}" class="w-7 h-7 rounded object-cover bg-slate-800 shrink-0">
+          <div class="min-w-0">
+            <div class="text-[11px] font-medium text-slate-200 truncate max-w-[120px]">${item.name}</div>
+            <div class="text-[9px] text-amber-400/80 font-mono">${item.gold}G</div>
+          </div>
+        `;
+        btn.addEventListener('click', () => {
+          const itemsKey = getBuildItemsKey(myChampId, enemyId);
+          if (!itemsKey) return;
+          const current = Array.isArray(allMemos[itemsKey]) ? [...allMemos[itemsKey]] : [];
+          current.push(item.id);
+          allMemos[itemsKey] = current;
+          renderSelectedBuildItems();
+          scheduleAutoSave();
+        });
+        itemSearchResultsEl.appendChild(btn);
+      });
     }
 
     function refreshMemoViews() {
@@ -222,7 +366,7 @@
 
         buildMemoLabel.textContent = `🛡️ ビルド・ルーン：${selfName} vs ${enemyName}`;
         buildMemoInput.disabled = false;
-        buildMemoInput.placeholder = `例）初手: ドランシールド / 靴: スチールキャップ / コア: ルインドキング → イモータル / ルーン: リーサルテンポ・息継ぎ`;
+        buildMemoInput.placeholder = `ルーン（例: リーサルテンポ・息継ぎ）・サモナースペル・購入順の補足メモ...`;
         if (document.activeElement !== buildMemoInput) {
           buildMemoInput.value = allMemos[buildKey] || '';
         }
@@ -250,6 +394,8 @@
         matchupMemoInput.value = '';
         matchupMemoInput.disabled = true;
       }
+
+      renderSelectedBuildItems();
     }
 
     function renderFavorites() {
@@ -293,6 +439,7 @@
       localStorage.setItem(LOCAL_MY_CHAMP_KEY, myChampId);
       renderFavorites();
       refreshMemoViews();
+      renderItemSearchResults(itemSearchInput.value);
     }
 
     async function loadMemosFromCloud() {
@@ -387,9 +534,38 @@
         patchVersion = versions[0];
         patchBadgeEl.textContent = `Patch ${patchVersion}`;
 
-        const champRes = await fetch(`https://ddragon.leagueoflegends.com/cdn/${patchVersion}/data/ja_JP/champion.json`);
+        const [champRes, itemRes] = await Promise.all([
+          fetch(`https://ddragon.leagueoflegends.com/cdn/${patchVersion}/data/ja_JP/champion.json`),
+          fetch(`https://ddragon.leagueoflegends.com/cdn/${patchVersion}/data/ja_JP/item.json`)
+        ]);
+
         const champJson = await champRes.json();
         championData = champJson.data;
+
+        const itemJson = await itemRes.json();
+        itemData = itemJson.data;
+
+        // サモナーズリフト（Map 11）で購入可能なアイテムのみ整理
+        const seenNames = new Set();
+        searchableItems = Object.entries(itemData)
+          .filter(([id, item]) => {
+            if (!item || !item.name) return false;
+            if (item.maps && item.maps['11'] === false) return false;
+            if (item.gold && item.gold.purchasable === false) return false;
+            if (item.requiredChampion) return false;
+            if (seenNames.has(item.name)) return false;
+            seenNames.add(item.name);
+            return true;
+          })
+          .map(([id, item]) => ({
+            id,
+            name: item.name,
+            colloq: item.colloq || '',
+            plaintext: item.plaintext || '',
+            gold: item.gold?.total ?? 0,
+            image: item.image
+          }))
+          .sort((a, b) => b.gold - a.gold);
 
         const sortedChamps = Object.values(championData).sort((a, b) => a.name.localeCompare(b.name, 'ja'));
         sortedChamps.forEach(champ => {
@@ -432,6 +608,7 @@
       champIconEl.classList.remove('hidden');
 
       refreshMemoViews();
+      renderItemSearchResults(itemSearchInput.value);
 
       try {
         const detailRes = await fetch(`https://ddragon.leagueoflegends.com/cdn/${patchVersion}/data/ja_JP/champion/${champId}.json`);
@@ -490,6 +667,20 @@
                (c.tags && c.tags.some(t => t.toLowerCase().includes(query)));
       }) || '';
     }
+
+    // アイテム検索 & 全クリア
+    itemSearchInput.addEventListener('input', (e) => {
+      renderItemSearchResults(e.target.value);
+    });
+
+    clearBuildItemsBtn.addEventListener('click', () => {
+      const enemyId = currentEnemyId || (champSelect ? champSelect.value : '');
+      if (!myChampId || !enemyId) return;
+      const itemsKey = getBuildItemsKey(myChampId, enemyId);
+      allMemos[itemsKey] = [];
+      renderSelectedBuildItems();
+      scheduleAutoSave();
+    });
 
     // 1. ビルドメモ入力時の自動保存
     buildMemoInput.addEventListener('input', () => {
