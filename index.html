@@ -20,7 +20,7 @@
       <div>
         <p class="text-[10px] font-bold tracking-widest text-amber-500/80 uppercase">Summoner's Notebook</p>
         <h1 class="text-xl font-bold tracking-wider text-amber-400 flex items-center gap-2">
-          <span class="text-2xl">⚔️</span> LoL 対面対策メモ
+          <span class="text-2xl">⚔️</span> LoL 対面対策 & ビルドメモ
         </h1>
       </div>
       <span id="sync-status" class="text-xs text-slate-400">クラウド同期準備中...</span>
@@ -94,10 +94,36 @@
         </div>
       </div>
 
-      <!-- 右カラム：2種類の対策メモ -->
+      <!-- 右カラム：ビルドメモ & 2種類の対策メモ -->
       <div class="lg:col-span-6 space-y-4 lg:sticky lg:top-4">
 
-        <!-- 1. 相手キャラ共通の対策メモ -->
+        <!-- 1. ビルド・ルーンメモ（自キャラ × 対面） -->
+        <div class="bg-slate-900 p-4 rounded-xl border border-emerald-500/30 shadow-lg space-y-2">
+          <div class="flex justify-between items-center gap-2">
+            <label for="build-memo-input" id="build-memo-label" class="text-xs font-bold text-emerald-400 uppercase tracking-wider">
+              🛡️ ビルド・ルーンメモ（自キャラ × 対面）
+            </label>
+            <span class="text-[10px] text-slate-500 shrink-0">自動同期中</span>
+          </div>
+          <textarea id="build-memo-input" rows="5"
+            class="w-full p-3 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-emerald-500 transition leading-relaxed"
+            placeholder="自分のキャラと対面キャラを選ぶと、初手アイテム・コアビルド・靴・ルーンなどを記録できます..."></textarea>
+        </div>
+
+        <!-- 2. 自分 × 相手の組み合わせ専用立ち回りメモ -->
+        <div class="bg-slate-900 p-4 rounded-xl border border-amber-500/30 shadow-lg space-y-2">
+          <div class="flex justify-between items-center gap-2">
+            <label for="matchup-memo-input" id="matchup-memo-label" class="text-xs font-bold text-amber-400 uppercase tracking-wider">
+              ⚔️ 対面個別メモ（自キャラ × 対面）
+            </label>
+            <span class="text-[10px] text-slate-500 shrink-0">自動同期中</span>
+          </div>
+          <textarea id="matchup-memo-input" rows="6"
+            class="w-full p-3 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-amber-500 transition leading-relaxed"
+            placeholder="自分のキャラと対面キャラの両方を選ぶと、この組み合わせ専用の立ち回りメモを書けます..."></textarea>
+        </div>
+
+        <!-- 3. 相手キャラ共通の対策メモ -->
         <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-lg space-y-2">
           <div class="flex justify-between items-center gap-2">
             <label for="common-memo-input" id="common-memo-label" class="text-xs font-bold text-sky-400 uppercase tracking-wider">
@@ -105,22 +131,9 @@
             </label>
             <span class="text-[10px] text-slate-500 shrink-0">全自キャラで共有</span>
           </div>
-          <textarea id="common-memo-input" rows="7"
+          <textarea id="common-memo-input" rows="5"
             class="w-full p-3 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-sky-500 transition leading-relaxed"
             placeholder="対面チャンピオンを選択すると、どの自キャラでも共通で見られる対策メモを書けます..."></textarea>
-        </div>
-
-        <!-- 2. 自分 × 相手の組み合わせ専用メモ -->
-        <div class="bg-slate-900 p-4 rounded-xl border border-amber-500/30 shadow-lg space-y-2">
-          <div class="flex justify-between items-center gap-2">
-            <label for="matchup-memo-input" id="matchup-memo-label" class="text-xs font-bold text-amber-400 uppercase tracking-wider">
-              ⚔️ 対面個別メモ（自キャラ × 対面）
-            </label>
-            <span class="text-[10px] text-slate-500 shrink-0">スマホ・PC間 自動同期中</span>
-          </div>
-          <textarea id="matchup-memo-input" rows="9"
-            class="w-full p-3 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-amber-500 transition leading-relaxed"
-            placeholder="自分のキャラと対面キャラの両方を選ぶと、この組み合わせ専用のメモを書けます..."></textarea>
         </div>
 
       </div>
@@ -160,6 +173,8 @@
     const patchBadgeEl = document.getElementById('patch-badge');
     const skillsContainer = document.getElementById('skills-container');
 
+    const buildMemoLabel = document.getElementById('build-memo-label');
+    const buildMemoInput = document.getElementById('build-memo-input');
     const commonMemoLabel = document.getElementById('common-memo-label');
     const commonMemoInput = document.getElementById('common-memo-input');
     const matchupMemoLabel = document.getElementById('matchup-memo-label');
@@ -177,11 +192,17 @@
       return `${selfId}__${enemyId}`;
     }
 
+    function getBuildKey(selfId = myChampId, enemyId = currentEnemyId) {
+      if (!selfId || !enemyId) return '';
+      return `build__${selfId}__${enemyId}`;
+    }
+
     function refreshMemoViews() {
       const enemyId = currentEnemyId || (champSelect ? champSelect.value : '');
       const enemyName = enemyId ? (championData[enemyId]?.name || enemyId) : '';
       const selfName = myChampId ? (championData[myChampId]?.name || myChampId) : '';
 
+      // 1. 相手キャラ共通メモ
       if (enemyId) {
         commonMemoLabel.textContent = `📌 相手対策メモ：vs ${enemyName}（全自キャラ共通）`;
         commonMemoInput.disabled = false;
@@ -194,19 +215,37 @@
         commonMemoInput.disabled = true;
       }
 
+      // 2 & 3. 自分 × 相手のビルドメモ & 個別立ち回りメモ
       if (myChampId && enemyId) {
-        const key = getMatchupKey(myChampId, enemyId);
+        const matchupKey = getMatchupKey(myChampId, enemyId);
+        const buildKey = getBuildKey(myChampId, enemyId);
+
+        buildMemoLabel.textContent = `🛡️ ビルド・ルーン：${selfName} vs ${enemyName}`;
+        buildMemoInput.disabled = false;
+        buildMemoInput.placeholder = `例）初手: ドランシールド / 靴: スチールキャップ / コア: ルインドキング → イモータル / ルーン: リーサルテンポ・息継ぎ`;
+        if (document.activeElement !== buildMemoInput) {
+          buildMemoInput.value = allMemos[buildKey] || '';
+        }
+
         matchupMemoLabel.textContent = `⚔️ 個別メモ：${selfName} vs ${enemyName}`;
         matchupMemoInput.disabled = false;
-        matchupMemoInput.placeholder = `${selfName} で ${enemyName} と戦うときの立ち回り・ビルド・注意点...`;
+        matchupMemoInput.placeholder = `${selfName} で ${enemyName} と戦うときの立ち回り・トレード・注意点...`;
         if (document.activeElement !== matchupMemoInput) {
-          matchupMemoInput.value = allMemos[key] || '';
+          matchupMemoInput.value = allMemos[matchupKey] || '';
         }
       } else if (!myChampId && enemyId) {
-        matchupMemoLabel.textContent = `⚔️ 個別メモ（上の「自分が使うチャンピオン」を選ぶと入力できます）`;
+        buildMemoLabel.textContent = '🛡️ ビルド・ルーン（上の「自分が使うチャンピオン」を選ぶと入力できます）';
+        buildMemoInput.value = '';
+        buildMemoInput.disabled = true;
+
+        matchupMemoLabel.textContent = '⚔️ 個別メモ（上の「自分が使うチャンピオン」を選ぶと入力できます）';
         matchupMemoInput.value = '';
         matchupMemoInput.disabled = true;
       } else {
+        buildMemoLabel.textContent = '🛡️ ビルド・ルーンメモ（自キャラ × 対面）';
+        buildMemoInput.value = '';
+        buildMemoInput.disabled = true;
+
         matchupMemoLabel.textContent = '⚔️ 対面個別メモ（自キャラ × 対面）';
         matchupMemoInput.value = '';
         matchupMemoInput.disabled = true;
@@ -271,7 +310,6 @@
           delete fetchedData.init;
           allMemos = fetchedData;
 
-          // クラウドにお気に入り配列があれば同期
           if (Array.isArray(allMemos[CLOUD_FAV_KEY])) {
             favoriteChamps = allMemos[CLOUD_FAV_KEY];
             localStorage.setItem(LOCAL_FAV_CHAMPS_KEY, JSON.stringify(favoriteChamps));
@@ -453,18 +491,29 @@
       }) || '';
     }
 
-    commonMemoInput.addEventListener('input', () => {
+    // 1. ビルドメモ入力時の自動保存
+    buildMemoInput.addEventListener('input', () => {
       const enemyId = currentEnemyId || (champSelect ? champSelect.value : '');
-      if (!enemyId) return;
-      allMemos[enemyId] = commonMemoInput.value;
+      if (!myChampId || !enemyId) return;
+      const key = getBuildKey(myChampId, enemyId);
+      allMemos[key] = buildMemoInput.value;
       scheduleAutoSave();
     });
 
+    // 2. 自分 × 相手立ち回りメモ入力時の自動保存
     matchupMemoInput.addEventListener('input', () => {
       const enemyId = currentEnemyId || (champSelect ? champSelect.value : '');
       if (!myChampId || !enemyId) return;
       const key = getMatchupKey(myChampId, enemyId);
       allMemos[key] = matchupMemoInput.value;
+      scheduleAutoSave();
+    });
+
+    // 3. 相手キャラ共通メモ入力時の自動保存
+    commonMemoInput.addEventListener('input', () => {
+      const enemyId = currentEnemyId || (champSelect ? champSelect.value : '');
+      if (!enemyId) return;
+      allMemos[enemyId] = commonMemoInput.value;
       scheduleAutoSave();
     });
 
@@ -509,7 +558,12 @@
     });
 
     setInterval(() => {
-      if (!isSaving && document.activeElement !== commonMemoInput && document.activeElement !== matchupMemoInput) {
+      if (
+        !isSaving &&
+        document.activeElement !== buildMemoInput &&
+        document.activeElement !== commonMemoInput &&
+        document.activeElement !== matchupMemoInput
+      ) {
         loadMemosFromCloud();
       }
     }, 3000);
