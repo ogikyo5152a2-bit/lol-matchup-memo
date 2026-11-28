@@ -13,17 +13,45 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen p-3 md:p-6">
+
+  <!-- パスコードロック画面 -->
+  <div id="lock-screen" class="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur flex items-center justify-center p-4">
+    <div class="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-4">
+      <div class="text-center space-y-1">
+        <div class="text-3xl">🔒</div>
+        <h2 class="text-lg font-bold text-amber-400">パスコードを入力</h2>
+        <p class="text-xs text-slate-400">メモとビルドデータをロック中です</p>
+      </div>
+
+      <form id="passcode-form" class="space-y-3">
+        <input type="password" id="passcode-input" autocomplete="current-password" placeholder="パスコード"
+          class="w-full p-3 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 placeholder-slate-500 text-sm text-center tracking-widest focus:outline-none focus:border-amber-500 transition">
+        <p id="passcode-error" class="text-xs text-rose-400 text-center hidden">パスコードが違います</p>
+        <button type="submit"
+          class="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm transition">
+          ロック解除
+        </button>
+      </form>
+    </div>
+  </div>
+
   <div class="max-w-2xl lg:max-w-6xl mx-auto space-y-4">
 
     <!-- ヘッダー -->
-    <header class="flex items-center justify-between border-b border-slate-800 pb-3">
+    <header class="flex items-center justify-between border-b border-slate-800 pb-3 gap-2">
       <div>
         <p class="text-[10px] font-bold tracking-widest text-amber-500/80 uppercase">Summoner's Notebook</p>
         <h1 class="text-xl font-bold tracking-wider text-amber-400 flex items-center gap-2">
           <span class="text-2xl">⚔️</span> LoL 対面対策 & ビルドメモ
         </h1>
       </div>
-      <span id="sync-status" class="text-xs text-slate-400">クラウド同期準備中...</span>
+      <div class="flex items-center gap-3 shrink-0">
+        <span id="sync-status" class="text-xs text-slate-400">クラウド同期準備中...</span>
+        <button type="button" id="lock-btn"
+          class="text-xs px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 transition">
+          🔒 ロック
+        </button>
+      </div>
     </header>
 
     <!-- 自分が使うキャラ & 対面キャラ選択エリア -->
@@ -106,7 +134,7 @@
             <span class="text-[10px] text-slate-500 shrink-0">自動同期中</span>
           </div>
 
-          <!-- 選択済みアイテムアイコン並び -->
+          <!-- 選択済みビルドアイコン並び -->
           <div class="p-2.5 rounded-lg bg-slate-950 border border-slate-800 space-y-2">
             <div class="flex items-center justify-between">
               <span class="text-[11px] font-semibold text-emerald-300/90">📦 ビルド順アイコン（タップで削除）</span>
@@ -166,8 +194,11 @@
 
   <script>
     // ==========================================
-    // JSONBin.io 接続設定
+    // パスコード & JSONBin.io 接続設定
     // ==========================================
+    const PASSCODE = '9029';
+    const LOCAL_UNLOCK_KEY = 'lol_matchup_unlocked';
+
     const JSONBIN_BIN_ID = '6acef0dbac6210605a2f8d8d';
     const JSONBIN_API_KEY = '$2a$10$br6EMb6FlcCl6LWoreVIq.xaxHVm/KFTessT6K/WNzAGw9Otx/9z.';
     const LOCAL_MY_CHAMP_KEY = 'lol_matchup_my_champ_id';
@@ -184,6 +215,13 @@
     let saveTimeout = null;
     let isSaving = false;
     let patchVersion = '14.24.1';
+    let isUnlocked = localStorage.getItem(LOCAL_UNLOCK_KEY) === '1';
+
+    const lockScreen = document.getElementById('lock-screen');
+    const passcodeForm = document.getElementById('passcode-form');
+    const passcodeInput = document.getElementById('passcode-input');
+    const passcodeError = document.getElementById('passcode-error');
+    const lockBtn = document.getElementById('lock-btn');
 
     const myChampSearch = document.getElementById('my-champ-search');
     const myChampSelect = document.getElementById('my-champ-select');
@@ -211,6 +249,36 @@
     const matchupMemoInput = document.getElementById('matchup-memo-input');
     const syncStatus = document.getElementById('sync-status');
 
+    function syncLockState() {
+      if (isUnlocked) {
+        lockScreen.classList.add('hidden');
+        passcodeError.classList.add('hidden');
+        loadMemosFromCloud();
+      } else {
+        lockScreen.classList.remove('hidden');
+        passcodeInput.value = '';
+        setTimeout(() => passcodeInput.focus(), 50);
+      }
+    }
+
+    passcodeForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (passcodeInput.value === PASSCODE) {
+        isUnlocked = true;
+        localStorage.setItem(LOCAL_UNLOCK_KEY, '1');
+        syncLockState();
+      } else {
+        passcodeError.classList.remove('hidden');
+        passcodeInput.select();
+      }
+    });
+
+    lockBtn.addEventListener('click', () => {
+      isUnlocked = false;
+      localStorage.removeItem(LOCAL_UNLOCK_KEY);
+      syncLockState();
+    });
+
     function stripHtml(html) {
       const tmp = document.createElement('DIV');
       tmp.innerHTML = html;
@@ -232,10 +300,9 @@
       return `build_items__${selfId}__${enemyId}`;
     }
 
-    // 選択済みビルドアイコン描画
     function renderSelectedBuildItems() {
       const enemyId = currentEnemyId || (champSelect ? champSelect.value : '');
-      const canEdit = Boolean(myChampId && enemyId && Object.keys(itemData).length);
+      const canEdit = Boolean(isUnlocked && myChampId && enemyId && Object.keys(itemData).length);
       itemSearchInput.disabled = !canEdit;
 
       if (!canEdit) {
@@ -287,10 +354,9 @@
       });
     }
 
-    // アイテム検索候補の描画
     function renderItemSearchResults(rawQuery) {
       const enemyId = currentEnemyId || (champSelect ? champSelect.value : '');
-      if (!myChampId || !enemyId) {
+      if (!isUnlocked || !myChampId || !enemyId) {
         itemSearchResultsEl.innerHTML = '';
         return;
       }
@@ -346,7 +412,17 @@
       const enemyName = enemyId ? (championData[enemyId]?.name || enemyId) : '';
       const selfName = myChampId ? (championData[myChampId]?.name || myChampId) : '';
 
-      // 1. 相手キャラ共通メモ
+      if (!isUnlocked) {
+        commonMemoInput.value = '';
+        commonMemoInput.disabled = true;
+        buildMemoInput.value = '';
+        buildMemoInput.disabled = true;
+        matchupMemoInput.value = '';
+        matchupMemoInput.disabled = true;
+        renderSelectedBuildItems();
+        return;
+      }
+
       if (enemyId) {
         commonMemoLabel.textContent = `📌 相手対策メモ：vs ${enemyName}（全自キャラ共通）`;
         commonMemoInput.disabled = false;
@@ -359,7 +435,6 @@
         commonMemoInput.disabled = true;
       }
 
-      // 2 & 3. 自分 × 相手のビルドメモ & 個別立ち回りメモ
       if (myChampId && enemyId) {
         const matchupKey = getMatchupKey(myChampId, enemyId);
         const buildKey = getBuildKey(myChampId, enemyId);
@@ -443,6 +518,12 @@
     }
 
     async function loadMemosFromCloud() {
+      if (!isUnlocked) {
+        syncStatus.textContent = 'ロック中';
+        syncStatus.className = 'text-xs text-slate-500';
+        return;
+      }
+
       try {
         const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}/latest`, {
           method: 'GET',
@@ -481,6 +562,8 @@
     }
 
     async function saveMemosToCloud() {
+      if (!isUnlocked) return;
+
       isSaving = true;
       syncStatus.textContent = 'クラウドへ保存中...';
       syncStatus.className = 'text-xs text-amber-400';
@@ -517,6 +600,7 @@
     }
 
     function scheduleAutoSave() {
+      if (!isUnlocked) return;
       syncStatus.textContent = '入力中...';
       syncStatus.className = 'text-xs text-amber-400/80';
       clearTimeout(saveTimeout);
@@ -526,7 +610,11 @@
     }
 
     async function initLoLData() {
-      await loadMemosFromCloud();
+      if (isUnlocked) {
+        await loadMemosFromCloud();
+      } else {
+        syncLockState();
+      }
 
       try {
         const versionsRes = await fetch('https://ddragon.leagueoflegends.com/api/versions.json');
@@ -545,7 +633,6 @@
         const itemJson = await itemRes.json();
         itemData = itemJson.data;
 
-        // サモナーズリフト（Map 11）で購入可能なアイテムのみ整理
         const seenNames = new Set();
         searchableItems = Object.entries(itemData)
           .filter(([id, item]) => {
@@ -668,12 +755,12 @@
       }) || '';
     }
 
-    // アイテム検索 & 全クリア
     itemSearchInput.addEventListener('input', (e) => {
       renderItemSearchResults(e.target.value);
     });
 
     clearBuildItemsBtn.addEventListener('click', () => {
+      if (!isUnlocked) return;
       const enemyId = currentEnemyId || (champSelect ? champSelect.value : '');
       if (!myChampId || !enemyId) return;
       const itemsKey = getBuildItemsKey(myChampId, enemyId);
@@ -682,8 +769,8 @@
       scheduleAutoSave();
     });
 
-    // 1. ビルドメモ入力時の自動保存
     buildMemoInput.addEventListener('input', () => {
+      if (!isUnlocked) return;
       const enemyId = currentEnemyId || (champSelect ? champSelect.value : '');
       if (!myChampId || !enemyId) return;
       const key = getBuildKey(myChampId, enemyId);
@@ -691,8 +778,8 @@
       scheduleAutoSave();
     });
 
-    // 2. 自分 × 相手立ち回りメモ入力時の自動保存
     matchupMemoInput.addEventListener('input', () => {
+      if (!isUnlocked) return;
       const enemyId = currentEnemyId || (champSelect ? champSelect.value : '');
       if (!myChampId || !enemyId) return;
       const key = getMatchupKey(myChampId, enemyId);
@@ -700,8 +787,8 @@
       scheduleAutoSave();
     });
 
-    // 3. 相手キャラ共通メモ入力時の自動保存
     commonMemoInput.addEventListener('input', () => {
+      if (!isUnlocked) return;
       const enemyId = currentEnemyId || (champSelect ? champSelect.value : '');
       if (!enemyId) return;
       allMemos[enemyId] = commonMemoInput.value;
@@ -709,7 +796,7 @@
     });
 
     toggleFavBtn.addEventListener('click', () => {
-      if (!myChampId) return;
+      if (!isUnlocked || !myChampId) return;
       if (favoriteChamps.includes(myChampId)) {
         favoriteChamps = favoriteChamps.filter(id => id !== myChampId);
       } else {
@@ -750,6 +837,7 @@
 
     setInterval(() => {
       if (
+        isUnlocked &&
         !isSaving &&
         document.activeElement !== buildMemoInput &&
         document.activeElement !== commonMemoInput &&
