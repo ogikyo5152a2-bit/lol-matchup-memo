@@ -197,7 +197,9 @@
     // パスコード & JSONBin.io 接続設定
     // ==========================================
     const PASSCODE = '9029';
-    const LOCAL_UNLOCK_KEY = 'lol_matchup_unlocked';
+    const UNLOCK_DAYS = 30;
+    const LOCAL_UNLOCK_KEY = 'lol_matchup_unlocked_v2';
+    const COOKIE_UNLOCK_KEY = 'lol_matchup_unlocked';
 
     const JSONBIN_BIN_ID = '6b0a23891b390e1b559d11a5';
     const JSONBIN_API_KEY = '$2a$10$UWWwhOlfn/pZ4.J5M3Ju/.LH1C/8rpQOYBSulE8vSD.y9czC/Qjb6';
@@ -209,13 +211,83 @@
     let itemData = {};
     let searchableItems = [];
     let currentEnemyId = '';
-    let myChampId = localStorage.getItem(LOCAL_MY_CHAMP_KEY) || 'Yone';
-    let favoriteChamps = JSON.parse(localStorage.getItem(LOCAL_FAV_CHAMPS_KEY) || '["Yone"]');
+    let myChampId = readStorage(LOCAL_MY_CHAMP_KEY) || 'Yone';
+    let favoriteChamps = JSON.parse(readStorage(LOCAL_FAV_CHAMPS_KEY) || '["Yone"]');
     let allMemos = {};
     let saveTimeout = null;
     let isSaving = false;
     let patchVersion = '14.24.1';
-    let isUnlocked = localStorage.getItem(LOCAL_UNLOCK_KEY) === '1';
+
+    function readStorage(key) {
+      try {
+        return localStorage.getItem(key);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function writeStorage(key, value) {
+      try {
+        localStorage.setItem(key, value);
+      } catch (e) {}
+    }
+
+    function removeStorage(key) {
+      try {
+        localStorage.removeItem(key);
+      } catch (e) {}
+    }
+
+    function readCookie(name) {
+      const match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()[\]\\/+^])/g, '\\$1') + '=([^;]*)'));
+      return match ? decodeURIComponent(match[1]) : null;
+    }
+
+    function writeCookie(name, value, days) {
+      const maxAge = days * 24 * 60 * 60;
+      document.cookie = `${name}=${encodeURIComponent(value)}; max-age=${maxAge}; path=/; SameSite=Lax`;
+    }
+
+    function clearCookie(name) {
+      document.cookie = `${name}=; max-age=0; path=/; SameSite=Lax`;
+    }
+
+    function checkIsUnlocked() {
+      const now = Date.now();
+      const expiryMs = UNLOCK_DAYS * 24 * 60 * 60 * 1000;
+
+      const rawLocal = readStorage(LOCAL_UNLOCK_KEY);
+      if (rawLocal) {
+        const exp = Number(rawLocal);
+        if (!Number.isNaN(exp) && exp > now) {
+          return true;
+        }
+      }
+
+      const rawCookie = readCookie(COOKIE_UNLOCK_KEY);
+      if (rawCookie) {
+        const exp = Number(rawCookie);
+        if (!Number.isNaN(exp) && exp > now) {
+          writeStorage(LOCAL_UNLOCK_KEY, String(exp));
+          return true;
+        }
+      }
+
+      return false;
+    }
+
+    function setUnlockedState(unlocked) {
+      if (unlocked) {
+        const exp = Date.now() + UNLOCK_DAYS * 24 * 60 * 60 * 1000;
+        writeStorage(LOCAL_UNLOCK_KEY, String(exp));
+        writeCookie(COOKIE_UNLOCK_KEY, String(exp), UNLOCK_DAYS);
+      } else {
+        removeStorage(LOCAL_UNLOCK_KEY);
+        clearCookie(COOKIE_UNLOCK_KEY);
+      }
+    }
+
+    let isUnlocked = checkIsUnlocked();
 
     const lockScreen = document.getElementById('lock-screen');
     const passcodeForm = document.getElementById('passcode-form');
@@ -253,10 +325,13 @@
       if (isUnlocked) {
         lockScreen.classList.add('hidden');
         passcodeError.classList.add('hidden');
+        refreshMemoViews();
         loadMemosFromCloud();
       } else {
         lockScreen.classList.remove('hidden');
         passcodeInput.value = '';
+        syncStatus.textContent = 'ロック中';
+        syncStatus.className = 'text-xs text-slate-500';
         setTimeout(() => passcodeInput.focus(), 50);
       }
     }
@@ -265,7 +340,7 @@
       e.preventDefault();
       if (passcodeInput.value === PASSCODE) {
         isUnlocked = true;
-        localStorage.setItem(LOCAL_UNLOCK_KEY, '1');
+        setUnlockedState(true);
         syncLockState();
       } else {
         passcodeError.classList.remove('hidden');
@@ -275,7 +350,7 @@
 
     lockBtn.addEventListener('click', () => {
       isUnlocked = false;
-      localStorage.removeItem(LOCAL_UNLOCK_KEY);
+      setUnlockedState(false);
       syncLockState();
     });
 
@@ -511,7 +586,7 @@
     function setMyChampion(champId) {
       myChampId = champId || '';
       myChampSelect.value = myChampId;
-      localStorage.setItem(LOCAL_MY_CHAMP_KEY, myChampId);
+      writeStorage(LOCAL_MY_CHAMP_KEY, myChampId);
       renderFavorites();
       refreshMemoViews();
       renderItemSearchResults(itemSearchInput.value);
@@ -540,7 +615,7 @@
 
           if (Array.isArray(allMemos[CLOUD_FAV_KEY])) {
             favoriteChamps = allMemos[CLOUD_FAV_KEY];
-            localStorage.setItem(LOCAL_FAV_CHAMPS_KEY, JSON.stringify(favoriteChamps));
+            writeStorage(LOCAL_FAV_CHAMPS_KEY, JSON.stringify(favoriteChamps));
             renderFavorites();
           }
 
@@ -670,7 +745,7 @@
         favoriteChamps = favoriteChamps.filter(id => championData[id]);
         if (favoriteChamps.length === 0 && championData['Yone']) {
           favoriteChamps = ['Yone'];
-          localStorage.setItem(LOCAL_FAV_CHAMPS_KEY, JSON.stringify(favoriteChamps));
+          writeStorage(LOCAL_FAV_CHAMPS_KEY, JSON.stringify(favoriteChamps));
         }
 
         if (myChampId && championData[myChampId]) {
@@ -802,7 +877,7 @@
       } else {
         favoriteChamps.push(myChampId);
       }
-      localStorage.setItem(LOCAL_FAV_CHAMPS_KEY, JSON.stringify(favoriteChamps));
+      writeStorage(LOCAL_FAV_CHAMPS_KEY, JSON.stringify(favoriteChamps));
       allMemos[CLOUD_FAV_KEY] = favoriteChamps;
       renderFavorites();
       saveMemosToCloud();
