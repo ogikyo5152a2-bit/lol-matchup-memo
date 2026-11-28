@@ -14,8 +14,8 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen p-3 md:p-6">
 
-  <!-- パスコードロック画面 -->
-  <div id="lock-screen" class="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur flex items-center justify-center p-4">
+  <!-- パスコードロック画面（初期状態は非表示にし、未解除時のみ表示） -->
+  <div id="lock-screen" class="hidden fixed inset-0 z-50 bg-slate-950/95 backdrop-blur flex items-center justify-center p-4">
     <div class="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-4">
       <div class="text-center space-y-1">
         <div class="text-3xl">🔒</div>
@@ -254,7 +254,6 @@
 
     function checkIsUnlocked() {
       const now = Date.now();
-      const expiryMs = UNLOCK_DAYS * 24 * 60 * 60 * 1000;
 
       const rawLocal = readStorage(LOCAL_UNLOCK_KEY);
       if (rawLocal) {
